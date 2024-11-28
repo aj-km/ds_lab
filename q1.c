@@ -2212,3 +2212,1423 @@ int main() {
 }
 
 */
+
+
+/*
+Write a program to find out the list of users who owns a file having maximum size in the current working directory using Map Reduce Program. c++ very short and simple code
+#include <iostream>
+#include <filesystem>
+#include <map>
+#include <vector>
+#include <pwd.h>
+#include <sys/stat.h>
+
+using namespace std;
+namespace fs = std::filesystem;
+
+int main() {
+    map<string, vector<string>> userFileMap; // Map: user -> files
+    uintmax_t maxSize = 0;
+
+    // Iterate over files in the current directory
+    for (const auto& entry : fs::directory_iterator(fs::current_path())) {
+        if (entry.is_regular_file()) {
+            auto fileSize = entry.file_size();
+            maxSize = max(maxSize, fileSize); // Track maximum file size
+            
+            // Get file owner
+            struct stat fileStat;
+            stat(entry.path().c_str(), &fileStat);
+            struct passwd *pw = getpwuid(fileStat.st_uid);
+            string owner = pw ? pw->pw_name : "unknown";
+
+            userFileMap[owner].push_back(entry.path().string()); // Map file to owner
+        }
+    }
+
+    // Output users owning the files with maximum size
+    cout << "Users owning the largest files (" << maxSize << " bytes):\n";
+    for (const auto& [user, files] : userFileMap) {
+        for (const auto& file : files) {
+            if (fs::file_size(file) == maxSize) {
+                cout << "User: " << user << ", File: " << file << "\n";
+            }
+        }
+    }
+
+    return 0;
+}
+
+Implement RPC mechanism for a file transfer across a network in ‘C’ ++ a simple code and using namespace std
+#include <iostream>
+#include <fstream>
+#include <cstring>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+
+using namespace std;
+
+void sendFile(int clientSocket, const string& fileName) {
+    ifstream file(fileName, ios::binary);
+    if (!file) {
+        string error = "ERROR: File not found\n";
+        send(clientSocket, error.c_str(), error.size(), 0);
+        return;
+    }
+
+    string success = "SUCCESS\n";
+    send(clientSocket, success.c_str(), success.size(), 0);
+
+    char buffer[1024];
+    while (file.read(buffer, sizeof(buffer))) {
+        send(clientSocket, buffer, file.gcount(), 0);
+    }
+    if (file.gcount() > 0) {
+        send(clientSocket, buffer, file.gcount(), 0);
+    }
+
+    file.close();
+    cout << "File sent successfully.\n";
+}
+
+int main() {
+    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket < 0) {
+        cerr << "Socket creation failed.\n";
+        return 1;
+    }
+
+    sockaddr_in serverAddr{};
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
+        cerr << "Bind failed.\n";
+        close(serverSocket);
+        return 1;
+    }
+
+    if (listen(serverSocket, 5) < 0) {
+        cerr << "Listen failed.\n";
+        close(serverSocket);
+        return 1;
+    }
+
+    cout << "Server is listening on port 8080...\n";
+
+    sockaddr_in clientAddr{};
+    socklen_t clientLen = sizeof(clientAddr);
+    int clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &clientLen);
+    if (clientSocket < 0) {
+        cerr << "Accept failed.\n";
+        close(serverSocket);
+        return 1;
+    }
+
+    char fileName[256];
+    recv(clientSocket, fileName, sizeof(fileName), 0);
+    cout << "Request received for file: " << fileName << "\n";
+
+    sendFile(clientSocket, fileName);
+
+    close(clientSocket);
+    close(serverSocket);
+    return 0;
+}
+
+#include <iostream>
+#include <fstream>
+#include <cstring>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
+using namespace std;
+
+void receiveFile(int serverSocket, const string& fileName) {
+    char buffer[1024];
+    recv(serverSocket, buffer, sizeof(buffer), 0);
+    string response = buffer;
+
+    if (response.find("ERROR") != string::npos) {
+        cerr << "Server error: " << response;
+        return;
+    }
+
+    ofstream file("received_" + fileName, ios::binary);
+    while (int bytesRead = recv(serverSocket, buffer, sizeof(buffer), 0)) {
+        if (bytesRead < 0) {
+            cerr << "Error receiving file.\n";
+            break;
+        }
+        file.write(buffer, bytesRead);
+    }
+
+    file.close();
+    cout << "File received and saved as received_" << fileName << ".\n";
+}
+
+int main() {
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket < 0) {
+        cerr << "Socket creation failed.\n";
+        return 1;
+    }
+
+    sockaddr_in serverAddr{};
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1"); // Connect to localhost
+
+    if (connect(clientSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
+        cerr << "Connection failed.\n";
+        close(clientSocket);
+        return 1;
+    }
+
+    string fileName;
+    cout << "Enter the file name to request: ";
+    cin >> fileName;
+
+    send(clientSocket, fileName.c_str(), fileName.size() + 1, 0);
+    receiveFile(clientSocket, fileName);
+
+    close(clientSocket);
+    return 0;
+}
+
+design a ds which consist of server and client using threads in c++ short and simple code
+
+#include <iostream>
+#include <thread>
+#include <vector>
+#include <cstring>
+#include <netinet/in.h>
+#include <unistd.h>
+
+using namespace std;
+
+void handleClient(int clientSocket) {
+    char buffer[1024] = {0};
+    recv(clientSocket, buffer, sizeof(buffer), 0);
+    cout << "Client says: " << buffer << endl;
+
+    string response = "Hello from server!";
+    send(clientSocket, response.c_str(), response.size(), 0);
+
+    close(clientSocket);
+    cout << "Client disconnected.\n";
+}
+
+int main() {
+    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket < 0) {
+        cerr << "Socket creation failed.\n";
+        return 1;
+    }
+
+    sockaddr_in serverAddr{};
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(serverSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
+        cerr << "Bind failed.\n";
+        close(serverSocket);
+        return 1;
+    }
+
+    if (listen(serverSocket, 5) < 0) {
+        cerr << "Listen failed.\n";
+        close(serverSocket);
+        return 1;
+    }
+
+    cout << "Server is listening on port 8080...\n";
+
+    vector<thread> clientThreads;
+
+    while (true) {
+        sockaddr_in clientAddr{};
+        socklen_t clientLen = sizeof(clientAddr);
+        int clientSocket = accept(serverSocket, (struct sockaddr*)&clientAddr, &clientLen);
+        if (clientSocket < 0) {
+            cerr << "Accept failed.\n";
+            continue;
+        }
+
+        cout << "New client connected.\n";
+        clientThreads.emplace_back(handleClient, clientSocket);
+    }
+
+    for (auto& t : clientThreads) {
+        if (t.joinable()) {
+            t.join();
+        }
+    }
+
+    close(serverSocket);
+    return 0;
+}
+
+#include <iostream>
+#include <cstring>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
+using namespace std;
+
+int main() {
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket < 0) {
+        cerr << "Socket creation failed.\n";
+        return 1;
+    }
+
+    sockaddr_in serverAddr{};
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+    if (connect(clientSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr)) < 0) {
+        cerr << "Connection failed.\n";
+        close(clientSocket);
+        return 1;
+    }
+
+    string message = "Hello from client!";
+    send(clientSocket, message.c_str(), message.size(), 0);
+
+    char buffer[1024] = {0};
+    recv(clientSocket, buffer, sizeof(buffer), 0);
+    cout << "Server says: " << buffer << endl;
+
+    close(clientSocket);
+    return 0;
+}
+g++ server.cpp -o server -pthread
+g++ client.cpp -o client
+
+4.Write a program to create two processes. First process takes a string and  
+passes it to second process through a pipe. The second process 
+concatenates the received string with another string without using string 
+function and sends it back to the first process for printing.
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <sys/types.h>
+
+// Function to concatenate two strings manually
+void manualConcat(char *str1, char *str2, char *result) {
+    int i = 0, j = 0;
+
+    // Copy str1 to result
+    while (str1[i] != '\0') {
+        result[i] = str1[i];
+        i++;
+    }
+
+    // Append str2 to result
+    while (str2[j] != '\0') {
+        result[i] = str2[j];
+        i++;
+        j++;
+    }
+
+    // Null-terminate the concatenated string
+    result[i] = '\0';
+}
+
+int main() {
+    int pipe1[2], pipe2[2];  // Two pipes: one for each direction of communication
+    pid_t pid;
+    char input[100], concatenatedResult[200];
+    char appendStr[] = " - concatenated by Process 2";
+
+    // Create two pipes
+    if (pipe(pipe1) == -1 || pipe(pipe2) == -1) {
+        perror("Pipe creation failed");
+        return 1;
+    }
+
+    pid = fork();  // Create a new process
+
+    if (pid < 0) {
+        perror("Fork failed");
+        return 1;
+    }
+
+    if (pid == 0) {
+        // Child process (Process 2)
+        close(pipe1[1]);  // Close the write end of pipe1
+        close(pipe2[0]);  // Close the read end of pipe2
+
+        char receivedStr[100];
+        read(pipe1[0], receivedStr, sizeof(receivedStr));  // Read from pipe1
+
+        // Concatenate the received string with another string
+        manualConcat(receivedStr, appendStr, concatenatedResult);
+
+        // Write the concatenated result to pipe2
+        write(pipe2[1], concatenatedResult, strlen(concatenatedResult) + 1);
+
+        close(pipe1[0]);  // Close the read end of pipe1
+        close(pipe2[1]);  // Close the write end of pipe2
+    } else {
+        // Parent process (Process 1)
+        close(pipe1[0]);  // Close the read end of pipe1
+        close(pipe2[1]);  // Close the write end of pipe2
+
+        // Get input from the user
+        printf("Enter a string: ");
+        fgets(input, sizeof(input), stdin);
+        input[strcspn(input, "\n")] = '\0';  // Remove the newline character
+
+        // Write the input string to pipe1
+        write(pipe1[1], input, strlen(input) + 1);
+
+        // Read the concatenated result from pipe2
+        read(pipe2[0], concatenatedResult, sizeof(concatenatedResult));
+
+        // Print the concatenated result
+        printf("Concatenated string: %s\n", concatenatedResult);
+
+        close(pipe1[1]);  // Close the write end of pipe1
+        close(pipe2[0]);  // Close the read end of pipe2
+    }
+
+    return 0;
+}
+
+Below is the C program for a server that uses shared memory and semaphores to increment a counter. The shared memory is created using mmap.
+#include <stdio.h>
+#include <stdlib.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+int main() {
+    int *counter;
+    sem_t *sem;
+
+    // Create shared memory
+    int shm_fd = shm_open("shared_mem", O_CREAT | O_RDWR, 0666);
+    if (shm_fd == -1) {
+        perror("Shared memory creation failed");
+        return 1;
+    }
+
+    // Resize shared memory to store an integer
+    if (ftruncate(shm_fd, sizeof(int)) == -1) {
+        perror("Shared memory resizing failed");
+        return 1;
+    }
+
+    // Map shared memory
+    counter = (int *)mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    if (counter == MAP_FAILED) {
+        perror("Shared memory mapping failed");
+        return 1;
+    }
+
+    // Initialize semaphore
+    sem = sem_open("sem_counter", O_CREAT, 0644, 1);
+    if (sem == SEM_FAILED) {
+        perror("Semaphore creation failed");
+        return 1;
+    }
+
+    // Initialize counter in shared memory
+    *counter = 0;
+
+    printf("Server is running. Press Ctrl+C to stop.\n");
+
+    while (1) {
+        sem_wait(sem);  // Wait (lock semaphore)
+        (*counter)++;
+        printf("Server updated counter: %d\n", *counter);
+        sem_post(sem);  // Post (unlock semaphore)
+        sleep(1);
+    }
+
+    // Cleanup
+    munmap(counter, sizeof(int));
+    close(shm_fd);
+    shm_unlink("shared_mem");
+    sem_close(sem);
+    sem_unlink("sem_counter");
+
+    return 0;
+}
+
+3. Determine CPU Load of Node B from Node A
+
+#include <stdio.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <string.h>
+
+float calculateCPULoad() {
+    FILE *fp = fopen("/proc/stat", "r");
+    if (!fp) return -1;
+
+    long user, nice, system, idle;
+    fscanf(fp, "cpu %ld %ld %ld %ld", &user, &nice, &system, &idle);
+    fclose(fp);
+
+    static long prevUser = 0, prevNice = 0, prevSystem = 0, prevIdle = 0;
+    long total = (user + nice + system + idle) - (prevUser + prevNice + prevSystem + prevIdle);
+    long active = (user + nice + system) - (prevUser + prevNice + prevSystem);
+
+    prevUser = user;
+    prevNice = nice;
+    prevSystem = system;
+    prevIdle = idle;
+
+    return (float)active / total * 100;
+}
+
+int main() {
+    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket < 0) {
+        perror("Socket creation failed");
+        return 1;
+    }
+
+    struct sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    if (bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0) {
+        perror("Bind failed");
+        return 1;
+    }
+
+    if (listen(serverSocket, 5) < 0) {
+        perror("Listen failed");
+        return 1;
+    }
+
+    printf("CPU Load Server is running on port 8080...\n");
+
+    while (1) {
+        int clientSocket = accept(serverSocket, NULL, NULL);
+        if (clientSocket < 0) {
+            perror("Accept failed");
+            continue;
+        }
+
+        float cpuLoad = calculateCPULoad();
+        char response[50];
+        snprintf(response, sizeof(response), "CPU Load: %.2f%%", cpuLoad);
+
+        send(clientSocket, response, strlen(response), 0);
+        close(clientSocket);
+    }
+
+    close(serverSocket);
+    return 0;
+}
+
+#include <stdio.h>
+#include <string.h>
+#include <arpa/inet.h>
+
+int main() {
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket < 0) {
+        perror("Socket creation failed");
+        return 1;
+    }
+
+    struct sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    inet_pton(AF_INET, "192.168.1.2", &serverAddr.sin_addr); // Replace with Node B's IP
+
+    if (connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0) {
+        perror("Connection to Node B failed");
+        return 1;
+    }
+
+    char buffer[1024] = {0};
+    recv(clientSocket, buffer, sizeof(buffer), 0);
+    printf("Received from Node B: %s\n", buffer);
+
+    close(clientSocket);
+    return 0;
+}
+
+teps to Run
+Node B:
+
+Save the server code to cpu_load_server.c, compile it, and run:
+bash
+Copy code
+gcc cpu_load_server.c -o cpu_server
+./cpu_server
+Node A:
+
+Save the client code to cpu_load_client.c, compile it, and run:
+bash
+Copy code
+gcc cpu_load_client.c -o cpu_client
+./cpu_client
+Make sure to replace "192.168.1.2" in the client program with the actual IP address of Node B. These programs will allow Node A to determine Node B's CPU load.
+
+4.Write a client C program that reads counter value between sem_wait() and 
+sem_post(). Access shared memory using open().
+Write a client (UDP) C program that calls sendto() to send string to server 
+program knowing IP address and port number.
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <semaphore.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+int main() {
+    int *counter;
+    sem_t *sem;
+
+    // Open shared memory
+    int shm_fd = shm_open("shared_mem", O_RDWR, 0666);
+    if (shm_fd == -1) {
+        perror("Shared memory open failed");
+        return 1;
+    }
+
+    // Map shared memory
+    counter = (int *)mmap(NULL, sizeof(int), PROT_READ, MAP_SHARED, shm_fd, 0);
+    if (counter == MAP_FAILED) {
+        perror("Shared memory mapping failed");
+        return 1;
+    }
+
+    // Open semaphore
+    sem = sem_open("sem_counter", 0);
+    if (sem == SEM_FAILED) {
+        perror("Semaphore open failed");
+        return 1;
+    }
+
+    printf("Client is accessing the counter...\n");
+
+    while (1) {
+        sem_wait(sem);  // Lock semaphore
+        printf("Counter value: %d\n", *counter);
+        sem_post(sem);  // Unlock semaphore
+        sleep(1);  // Wait for a second before next read
+    }
+
+    // Cleanup
+    munmap(counter, sizeof(int));
+    sem_close(sem);
+
+    return 0;
+}
+
+#include <stdio.h>
+#include <string.h>
+#include <arpa/inet.h>
+
+int main() {
+    int clientSocket;
+    struct sockaddr_in serverAddr;
+    char message[1024];
+    char buffer[1024];
+
+    // Create UDP socket
+    clientSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    if (clientSocket < 0) {
+        perror("Socket creation failed");
+        return 1;
+    }
+
+    // Set server address
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr); // Replace with actual server IP if necessary
+
+    // Get user input and send to server
+    printf("Enter a message: ");
+    fgets(message, sizeof(message), stdin);
+    message[strcspn(message, "\n")] = '\0'; // Remove newline character
+
+    sendto(clientSocket, message, strlen(message), 0, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+    printf("Message sent to server.\n");
+
+    // Receive server response
+    socklen_t addrLen = sizeof(serverAddr);
+    int n = recvfrom(clientSocket, buffer, sizeof(buffer), 0, (struct sockaddr *)&serverAddr, &addrLen);
+    buffer[n] = '\0';
+    printf("Server response: %s\n", buffer);
+
+    // Close the socket
+    close(clientSocket);
+    return 0;
+}
+
+
+ii) Design a Distributed Application using Message Passing Interface (MPI)
+for remote computation.
+
+#include <mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int compute(int data) {
+    return data * data;  // Example computation: square the number
+}
+
+int main(int argc, char** argv) {
+    int rank, size;
+
+    MPI_Init(&argc, &argv);  // Initialize MPI
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    if (rank == 0) {
+        // Master process
+        int data[] = {1, 2, 3, 4, 5};  // Example data
+        int numData = sizeof(data) / sizeof(data[0]);
+        int results[size - 1];
+
+        // Send data to workers
+        for (int i = 1; i < size; i++) {
+            MPI_Send(&data[i - 1], 1, MPI_INT, i, 0, MPI_COMM_WORLD);
+        }
+
+        // Receive results from workers
+        for (int i = 1; i < size; i++) {
+            MPI_Recv(&results[i - 1], 1, MPI_INT, i, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        }
+
+        // Print results
+        printf("Results from workers:\n");
+        for (int i = 0; i < size - 1; i++) {
+            printf("Worker %d result: %d\n", i + 1, results[i]);
+        }
+
+    } else {
+        // Worker process
+        int receivedData, result;
+
+        // Receive data from master
+        MPI_Recv(&receivedData, 1, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+
+        // Perform computation
+        result = compute(receivedData);
+
+        // Send result back to master
+        MPI_Send(&result, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+    }
+
+    MPI_Finalize();  // Finalize MPI
+    return 0;
+}
+
+2. Logical Clock Synchronization Using Lamport's Algorithm
+
+#include <stdio.h>
+#define MAX_EVENTS 10
+
+void lamportClock(int events[], int n) {
+    int clock[MAX_EVENTS];
+    clock[0] = 1;  // Initialize the first event's clock
+
+    // Update the clock for each event
+    for (int i = 1; i < n; i++) {
+        clock[i] = clock[i - 1] + 1;  // Increment for local events
+
+        if (events[i] != -1) {  // For message receive events
+            clock[i] = (clock[i] > events[i] ? clock[i] : events[i]) + 1;
+        }
+    }
+
+    // Print the clock values
+    printf("Logical clock values:\n");
+    for (int i = 0; i < n; i++) {
+        printf("Event %d: %d\n", i + 1, clock[i]);
+    }
+}
+
+int main() {
+    int events[MAX_EVENTS] = {-1, -1, 1, -1, 3};  // Example events: -1 for local, others for receive
+    int n = 5;  // Number of events
+
+    lamportClock(events, n);
+
+    return 0;
+}
+
+ Logical Clock Synchronization Using Vector Clocks
+#include <stdio.h>
+#include <string.h>
+#define MAX_PROCESSES 3
+#define MAX_EVENTS 10
+
+void printVector(int vec[], int n) {
+    for (int i = 0; i < n; i++) {
+        printf("%d ", vec[i]);
+    }
+    printf("\n");
+}
+
+void vectorClock(int events[MAX_PROCESSES][MAX_EVENTS], int n, int m) {
+    int clock[MAX_PROCESSES][MAX_EVENTS][MAX_PROCESSES] = {{{0}}};
+
+    // Initialize the vector clock for each process
+    for (int p = 0; p < n; p++) {
+        for (int e = 0; e < m; e++) {
+            if (events[p][e] == 1) {  // Local event
+                for (int i = 0; i < n; i++) {
+                    clock[p][e][i] = (e > 0 ? clock[p][e - 1][i] : 0);
+                }
+                clock[p][e][p]++;
+            } else if (events[p][e] >= 2) {  // Message receive event
+                int sender = events[p][e] - 2;  // Map event value to sender
+                for (int i = 0; i < n; i++) {
+                    clock[p][e][i] = (e > 0 ? clock[p][e - 1][i] : 0);
+                    if (clock[p][e][i] < clock[sender][m - 1][i]) {
+                        clock[p][e][i] = clock[sender][m - 1][i];
+                    }
+                }
+                clock[p][e][p]++;
+            }
+        }
+    }
+
+    // Print the vector clock for each process
+    for (int p = 0; p < n; p++) {
+        printf("Process %d vector clocks:\n", p + 1);
+        for (int e = 0; e < m; e++) {
+            printf("Event %d: ", e + 1);
+            printVector(clock[p][e], n);
+        }
+    }
+}
+
+int main() {
+    int events[MAX_PROCESSES][MAX_EVENTS] = {
+        {1, 1, 1, 1, -1},
+        {1, 2, 1, -1, -1},
+        {1, -1, -1, -1, -1}
+    };  // Example: 1 for local, 2+ for receive events
+    int n = 3;  // Number of processes
+    int m = 5;  // Number of events per process
+
+    vectorClock(events, n, m);
+
+    return 0;
+}
+
+Save the code to a file (e.g., mpi_remote.c).
+Compile:
+bash
+Copy code
+mpicc mpi_remote.c -o mpi_remote
+Run:
+bash
+Copy code
+mpirun -np 4 ./mpi_remote
+Logical Clock Programs:
+Save the code to files (e.g., lamport.c and vector_clock.c).
+Compile and run:
+bash
+Copy code
+gcc lamport.c -o lamport
+./lamport
+
+gcc vector_clock.c -o vector_clock
+./vector_clock
+These programs simulate distributed systems with remote computation and logical clock synchronization effectively.
+
+
+Here are the solutions for the tasks:
+
+1. Simulate Distributed Mutual Exclusion Algorithm (Lamport and Ricart-Agrawala)
+Lamport's Algorithm
+c
+Copy code
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <unistd.h>
+
+int logical_clock = 0;
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void *process(void *arg) {
+    int pid = *((int *)arg);
+
+    // Request critical section
+    pthread_mutex_lock(&mutex);
+    logical_clock++;
+    printf("Process %d: Requesting critical section at clock %d\n", pid, logical_clock);
+    pthread_mutex_unlock(&mutex);
+
+    sleep(1);  // Simulate message exchange delay
+
+    // Enter critical section
+    pthread_mutex_lock(&mutex);
+    logical_clock++;
+    printf("Process %d: Entering critical section at clock %d\n", pid, logical_clock);
+    pthread_mutex_unlock(&mutex);
+
+    sleep(1);  // Simulate work in critical section
+
+    // Exit critical section
+    pthread_mutex_lock(&mutex);
+    logical_clock++;
+    printf("Process %d: Exiting critical section at clock %d\n", pid, logical_clock);
+    pthread_mutex_unlock(&mutex);
+
+    return NULL;
+}
+
+int main() {
+    int n = 3;  // Number of processes
+    pthread_t threads[n];
+    int ids[n];
+
+    for (int i = 0; i < n; i++) {
+        ids[i] = i + 1;
+        pthread_create(&threads[i], NULL, process, &ids[i]);
+    }
+
+    for (int i = 0; i < n; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    return 0;
+}
+Ricart-Agrawala Algorithm
+c
+Copy code
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <unistd.h>
+
+#define N 3  // Number of processes
+
+typedef struct {
+    int timestamp;
+    int id;
+} Request;
+
+int logical_clock = 0;
+int request_queue[N];
+int granted[N];
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void send_request(int pid) {
+    pthread_mutex_lock(&mutex);
+    logical_clock++;
+    request_queue[pid] = logical_clock;
+    printf("Process %d: Sending request at clock %d\n", pid, logical_clock);
+    pthread_mutex_unlock(&mutex);
+}
+
+void grant_request(int pid) {
+    pthread_mutex_lock(&mutex);
+    granted[pid] = 1;
+    printf("Process %d: Granting request at clock %d\n", pid, logical_clock);
+    pthread_mutex_unlock(&mutex);
+}
+
+void *process(void *arg) {
+    int pid = *((int *)arg);
+
+    send_request(pid);
+    sleep(1);  // Simulate communication delay
+
+    grant_request(pid);
+
+    // Enter critical section
+    pthread_mutex_lock(&mutex);
+    logical_clock++;
+    printf("Process %d: Entering critical section at clock %d\n", pid, logical_clock);
+    pthread_mutex_unlock(&mutex);
+
+    sleep(1);  // Simulate work in critical section
+
+    // Exit critical section
+    pthread_mutex_lock(&mutex);
+    logical_clock++;
+    printf("Process %d: Exiting critical section at clock %d\n", pid, logical_clock);
+    pthread_mutex_unlock(&mutex);
+
+    return NULL;
+}
+
+int main() {
+    pthread_t threads[N];
+    int ids[N];
+
+    for (int i = 0; i < N; i++) {
+        ids[i] = i + 1;
+        pthread_create(&threads[i], NULL, process, &ids[i]);
+    }
+
+    for (int i = 0; i < N; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    return 0;
+}
+2. Distributed Application: Server-Client Factorial Calculation
+Server Code:
+c
+Copy code
+#include <stdio.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+int factorial(int n) {
+    if (n == 0 || n == 1) return 1;
+    return n * factorial(n - 1);
+}
+
+int main() {
+    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket < 0) {
+        perror("Socket creation failed");
+        return 1;
+    }
+
+    struct sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+    listen(serverSocket, 5);
+
+    printf("Server is running...\n");
+
+    while (1) {
+        int clientSocket = accept(serverSocket, NULL, NULL);
+        if (clientSocket < 0) {
+            perror("Client connection failed");
+            continue;
+        }
+
+        int num, result;
+        read(clientSocket, &num, sizeof(num));
+        result = factorial(num);
+        write(clientSocket, &result, sizeof(result));
+
+        close(clientSocket);
+    }
+
+    close(serverSocket);
+    return 0;
+}
+Client Code:
+c
+Copy code
+#include <stdio.h>
+#include <arpa/inet.h>
+
+int main() {
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (clientSocket < 0) {
+        perror("Socket creation failed");
+        return 1;
+    }
+
+    struct sockaddr_in serverAddr;
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
+
+    connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+
+    int num = 5, result;
+    printf("Enter a number: ");
+    scanf("%d", &num);
+
+    write(clientSocket, &num, sizeof(num));
+    read(clientSocket, &result, sizeof(result));
+
+    printf("Factorial of %d is %d\n", num, result);
+
+    close(clientSocket);
+    return 0;
+}
+3. MapReduce Program to Find User Owning Largest File
+c
+Copy code
+#include <iostream>
+#include <filesystem>
+#include <map>
+#include <sys/stat.h>
+#include <pwd.h>
+
+namespace fs = std::filesystem;
+using namespace std;
+
+int main() {
+    map<string, uintmax_t> userFileSize;
+
+    uintmax_t maxSize = 0;
+    string maxOwner;
+
+    for (const auto& entry : fs::directory_iterator(fs::current_path())) {
+        if (entry.is_regular_file()) {
+            struct stat fileStat;
+            stat(entry.path().c_str(), &fileStat);
+
+            string owner = getpwuid(fileStat.st_uid)->pw_name;
+            uintmax_t size = fs::file_size(entry);
+
+            userFileSize[owner] += size;
+            if (userFileSize[owner] > maxSize) {
+                maxSize = userFileSize[owner];
+                maxOwner = owner;
+            }
+        }
+    }
+
+    cout << "User owning largest file(s): " << maxOwner << " with total size: " << maxSize << " bytes\n";
+    return 0;
+}
+Steps to Run
+Compile the programs:
+For mutual exclusion:
+bash
+Copy code
+gcc lamport.c -o lamport -pthread
+./lamport
+bash
+Copy code
+gcc ricart_agrawala.c -o ricart_agrawala -pthread
+./ricart_agrawala
+For server-client: Compile server and client separately:
+bash
+Copy code
+gcc server.c -o server
+gcc client.c -o client
+Run server first:
+bash
+Copy code
+./server
+Then run the client:
+bash
+Copy code
+./client
+For MapReduce:
+bash
+Copy code
+g++ mapreduce.cpp -o mapreduce
+./mapreduce
+Replace the paths and inputs as necessary!
+
+
+
+
+1. Concurrent Echo Client-Server Application
+Server Code:
+c
+Copy code
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <pthread.h>
+
+void *handle_client(void *client_sock) {
+    int clientSocket = *(int *)client_sock;
+    char buffer[1024];
+
+    while (1) {
+        memset(buffer, 0, sizeof(buffer));
+        int n = read(clientSocket, buffer, sizeof(buffer));
+        if (n <= 0) break;
+
+        printf("Client: %s\n", buffer);
+        write(clientSocket, buffer, n);
+    }
+
+    close(clientSocket);
+    return NULL;
+}
+
+int main() {
+    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in serverAddr;
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+    listen(serverSocket, 5);
+
+    printf("Server is listening...\n");
+
+    while (1) {
+        int clientSocket = accept(serverSocket, NULL, NULL);
+        printf("New client connected.\n");
+
+        pthread_t thread;
+        pthread_create(&thread, NULL, handle_client, &clientSocket);
+    }
+
+    close(serverSocket);
+    return 0;
+}
+Client Code:
+c
+Copy code
+#include <stdio.h>
+#include <string.h>
+#include <arpa/inet.h>
+
+int main() {
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in serverAddr;
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
+
+    connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+
+    char buffer[1024];
+    while (1) {
+        printf("Enter message: ");
+        fgets(buffer, sizeof(buffer), stdin);
+        write(clientSocket, buffer, strlen(buffer));
+
+        memset(buffer, 0, sizeof(buffer));
+        read(clientSocket, buffer, sizeof(buffer));
+        printf("Server: %s\n", buffer);
+    }
+
+    close(clientSocket);
+    return 0;
+}
+2. Client-Server Master Table Update
+Server Code:
+c
+Copy code
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+typedef struct {
+    int id;
+    char name[50];
+    char address[100];
+} ClientInfo;
+
+ClientInfo masterTable[100];
+int clientCount = 0;
+
+void update_master_table(int clientSocket) {
+    ClientInfo client;
+    read(clientSocket, &client, sizeof(ClientInfo));
+
+    masterTable[clientCount++] = client;
+
+    write(clientSocket, masterTable, sizeof(masterTable));
+}
+
+int main() {
+    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in serverAddr;
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+    listen(serverSocket, 5);
+
+    printf("Server is running...\n");
+
+    while (1) {
+        int clientSocket = accept(serverSocket, NULL, NULL);
+        printf("New client connected.\n");
+
+        update_master_table(clientSocket);
+
+        close(clientSocket);
+    }
+
+    close(serverSocket);
+    return 0;
+}
+Client Code:
+c
+Copy code
+#include <stdio.h>
+#include <string.h>
+#include <arpa/inet.h>
+
+typedef struct {
+    int id;
+    char name[50];
+    char address[100];
+} ClientInfo;
+
+int main() {
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in serverAddr;
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8080);
+    inet_pton(AF_INET, "127.0.0.1", &serverAddr.sin_addr);
+
+    connect(clientSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+
+    ClientInfo client = {1, "Client1", "192.168.1.1"};
+    write(clientSocket, &client, sizeof(ClientInfo));
+
+    ClientInfo masterTable[100];
+    read(clientSocket, masterTable, sizeof(masterTable));
+
+    printf("Updated Master Table:\n");
+    for (int i = 0; i < 100 && masterTable[i].id != 0; i++) {
+        printf("ID: %d, Name: %s, Address: %s\n", masterTable[i].id, masterTable[i].name, masterTable[i].address);
+    }
+
+    close(clientSocket);
+    return 0;
+}
+3. Load Balancer with Two TCP Servers
+Load Balancer Code:
+c
+Copy code
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+
+float getCPULoad(const char *ip) {
+    // Simulated CPU load
+    return rand() % 100 / 100.0;
+}
+
+void forward_request(const char *ip, int port, const char *message, char *response) {
+    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in serverAddr;
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(port);
+    inet_pton(AF_INET, ip, &serverAddr.sin_addr);
+
+    connect(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+
+    write(serverSocket, message, strlen(message));
+    read(serverSocket, response, 1024);
+
+    close(serverSocket);
+}
+
+int main() {
+    const char *server1_ip = "127.0.0.1";
+    const char *server2_ip = "127.0.0.2";
+    int port = 8081;
+
+    int balancerSocket = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in balancerAddr;
+
+    balancerAddr.sin_family = AF_INET;
+    balancerAddr.sin_port = htons(8080);
+    balancerAddr.sin_addr.s_addr = INADDR_ANY;
+
+    bind(balancerSocket, (struct sockaddr *)&balancerAddr, sizeof(balancerAddr));
+    listen(balancerSocket, 5);
+
+    printf("Load balancer is running...\n");
+
+    while (1) {
+        int clientSocket = accept(balancerSocket, NULL, NULL);
+        char buffer[1024], response[1024];
+        memset(buffer, 0, sizeof(buffer));
+
+        read(clientSocket, buffer, sizeof(buffer));
+
+        // Choose server with lower CPU utilization
+        float load1 = getCPULoad(server1_ip);
+        float load2 = getCPULoad(server2_ip);
+
+        if (load1 <= load2) {
+            forward_request(server1_ip, port, buffer, response);
+        } else {
+            forward_request(server2_ip, port, buffer, response);
+        }
+
+        write(clientSocket, response, strlen(response));
+        close(clientSocket);
+    }
+
+    close(balancerSocket);
+    return 0;
+}
+String Server Code:
+c
+Copy code
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <arpa/inet.h>
+
+void to_upper(char *str) {
+    for (int i = 0; str[i]; i++) {
+        str[i] = toupper(str[i]);
+    }
+}
+
+int main() {
+    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    struct sockaddr_in serverAddr;
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(8081);
+    serverAddr.sin_addr.s_addr = INADDR_ANY;
+
+    bind(serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr));
+    listen(serverSocket, 5);
+
+    printf("String server is running...\n");
+
+    while (1) {
+        int clientSocket = accept(serverSocket, NULL, NULL);
+        char buffer[1024];
+        read(clientSocket, buffer, sizeof(buffer));
+
+        to_upper(buffer);
+        write(clientSocket, buffer, strlen(buffer));
+
+        close(clientSocket);
+    }
+
+    close(serverSocket);
+    return 0;
+}
+Steps to Run:
+Concurrent Echo:
+Run the server, then multiple clients.
+Master Table Update:
+Start the server, then run multiple clients to update the table.
+Load Balancer:
+Start the two servers and the load balancer.
+Run clients to send requests to the load balancer.
+
+
+*/
